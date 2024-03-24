@@ -264,6 +264,42 @@ void Connector::EncodeCanFrame(const AgxMessage *msg, struct can_frame *tx_frame
     //       tx_frame->can_dlc);
 }
 
+void Connector::EncodeCanFrameV1(const AgxMessage *msg, can_frame *tx_frame)
+{
+    switch (msg->type) {
+    case AgxMsgMotionCommand:
+    {
+        static uint8_t count = 0;
+        tx_frame->can_id = (uint32_t)0x130;
+        tx_frame->can_dlc = 8;
+        MotionCommandFrame frame;
+        frame.control_mode = CTRL_MODE_CMD_CAN;
+        frame.error_clear_byte = (uint8_t)0x00;
+        frame.linear_percentage =
+            (int8_t)(linear_percentage*100);
+        frame.angular_percentage =
+            (int8_t)(Omega_percentage*100);
+        frame.lateral_percentage =
+            (int8_t)(0);
+        frame.reserved0 = 0;
+        frame.count = count++;
+        memcpy(tx_frame->data, (uint8_t *)(&frame), tx_frame->can_dlc);
+        tx_frame->data[7] = CalcCanFrameChecksumV1(
+            tx_frame->can_id, tx_frame->data, tx_frame->can_dlc);
+        break;
+    }
+
+    }
+    return ;
+}
+
+uint8_t Connector::CalcCanFrameChecksumV1(uint16_t id, uint8_t *data, uint8_t dlc) {
+    uint8_t checksum = 0x00;
+    checksum = (uint8_t)(id & 0x00ff) + (uint8_t)(id >> 8) + dlc;
+    for (int i = 0; i < (dlc - 1); ++i) checksum += data[i];
+    return checksum;
+}
+
 
 
 
@@ -410,13 +446,13 @@ void Connector::copy_to_can_frame(can_frame *rx_frame,const uint8_t *msg)
 {
     rx_frame->can_dlc=msg[0];
     rx_frame->can_id=(
-    static_cast<uint32_t>(msg[1]) << 24 |
-    static_cast<uint32_t>(msg[2]) << 16 |
-    static_cast<uint32_t>(msg[3]) <<  8 |
-    static_cast<uint32_t>(msg[4])   );
+        static_cast<uint32_t>(msg[1]) << 24 |
+        static_cast<uint32_t>(msg[2]) << 16 |
+        static_cast<uint32_t>(msg[3]) <<  8 |
+        static_cast<uint32_t>(msg[4])   );
 
     for(uint8_t count{0};count<sizeof(rx_frame->data);++count)
-    rx_frame->data[count]=msg[count+5];
+        rx_frame->data[count]=msg[count+5];
 }
 
 
@@ -452,7 +488,7 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
             static_cast<int16_t>(
                 static_cast<uint16_t>(msg.state.angular_velocity.low_byte) |
                 static_cast<uint16_t>(msg.state.angular_velocity.high_byte)
-                << 8) /
+                    << 8) /
             1000.0;
         break;
     }
@@ -479,13 +515,13 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
              static_cast<uint16_t>(msg.data.state.current.high_byte) << 8) /
             10.0;
         state.actuator_states[msg.motor_id].motor_rpm = static_cast<int16_t>(//更新电机转速
-                    static_cast<uint16_t>(msg.data.state.rpm.low_byte) |
-                    static_cast<uint16_t>(msg.data.state.rpm.high_byte) << 8);
+            static_cast<uint16_t>(msg.data.state.rpm.low_byte) |
+            static_cast<uint16_t>(msg.data.state.rpm.high_byte) << 8);
         state.actuator_states[msg.motor_id].motor_pulses = static_cast<int32_t>(
-                    static_cast<uint32_t>(msg.data.state.pulse_count.lsb) |
-                    static_cast<uint32_t>(msg.data.state.pulse_count.low_byte) << 8 |
-                    static_cast<uint32_t>(msg.data.state.pulse_count.high_byte) << 16 |
-                    static_cast<uint32_t>(msg.data.state.pulse_count.msb) << 24);
+            static_cast<uint32_t>(msg.data.state.pulse_count.lsb) |
+            static_cast<uint32_t>(msg.data.state.pulse_count.low_byte) << 8 |
+            static_cast<uint32_t>(msg.data.state.pulse_count.high_byte) << 16 |
+            static_cast<uint32_t>(msg.data.state.pulse_count.msb) << 24);
         break;
     }
     case AgxMsgActuatorLSState:  //如果回馈的是电机信息
@@ -497,13 +533,13 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
             state.actuator_states[msg.motor_id].driver_voltage =//更新电机驱动电压
                 (static_cast<uint16_t>(msg.data.state.driver_voltage.low_byte) |
                  static_cast<uint16_t>(msg.data.state.driver_voltage.high_byte)
-                 << 8) /
+                     << 8) /
                 10.0;
             state.actuator_states[msg.motor_id]
-            .driver_temperature = static_cast<int16_t>(//更新电机温度
-                                      static_cast<uint16_t>(msg.data.state.driver_temperature.low_byte) |
-                                      static_cast<uint16_t>(msg.data.state.driver_temperature.high_byte)
-                                      << 8);
+                .driver_temperature = static_cast<int16_t>(//更新电机温度
+                    static_cast<uint16_t>(msg.data.state.driver_temperature.low_byte) |
+                    static_cast<uint16_t>(msg.data.state.driver_temperature.high_byte)
+                        << 8);
             state.actuator_states[msg.motor_id].motor_temperature =
                 msg.data.state.motor_temperature;
             state.actuator_states[msg.motor_id].driver_state =
@@ -516,15 +552,15 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
         // std::cout << "Odometer msg feedback received" << std::endl;
         const OdometryMessage &msg = status_msg.body.odometry_msg;
         state.right_odometry = static_cast<int32_t>(
-                                   (static_cast<uint32_t>(msg.state.right_wheel.lsb)) |
-                                   (static_cast<uint32_t>(msg.state.right_wheel.low_byte) << 8) |
-                                   (static_cast<uint32_t>(msg.state.right_wheel.high_byte) << 16) |
-                                   (static_cast<uint32_t>(msg.state.right_wheel.msb) << 24));
+            (static_cast<uint32_t>(msg.state.right_wheel.lsb)) |
+            (static_cast<uint32_t>(msg.state.right_wheel.low_byte) << 8) |
+            (static_cast<uint32_t>(msg.state.right_wheel.high_byte) << 16) |
+            (static_cast<uint32_t>(msg.state.right_wheel.msb) << 24));
         state.left_odometry = static_cast<int32_t>(
-                                  (static_cast<uint32_t>(msg.state.left_wheel.lsb)) |
-                                  (static_cast<uint32_t>(msg.state.left_wheel.low_byte) << 8) |
-                                  (static_cast<uint32_t>(msg.state.left_wheel.high_byte) << 16) |
-                                  (static_cast<uint32_t>(msg.state.left_wheel.msb) << 24));
+            (static_cast<uint32_t>(msg.state.left_wheel.lsb)) |
+            (static_cast<uint32_t>(msg.state.left_wheel.low_byte) << 8) |
+            (static_cast<uint32_t>(msg.state.left_wheel.high_byte) << 16) |
+            (static_cast<uint32_t>(msg.state.left_wheel.msb) << 24));
         break;
     }
     case AgxMsgBmsDate:  //如果获取的电池信息
@@ -534,14 +570,14 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
         state.SOC = msg.state.battery_SOC;
         state.SOH = msg.state.battery_SOH;
         state.bms_battery_voltage = static_cast<int16_t>(
-                                        (static_cast<uint16_t>(msg.state.battery_voltage.low_byte)) |
-                                        (static_cast<uint16_t>(msg.state.battery_voltage.high_byte) << 8));
+            (static_cast<uint16_t>(msg.state.battery_voltage.low_byte)) |
+            (static_cast<uint16_t>(msg.state.battery_voltage.high_byte) << 8));
         state.battery_current = static_cast<int16_t>(
-                                    (static_cast<uint16_t>(msg.state.battery_current.low_byte)) |
-                                    (static_cast<uint16_t>(msg.state.battery_current.high_byte) << 8));
+            (static_cast<uint16_t>(msg.state.battery_current.low_byte)) |
+            (static_cast<uint16_t>(msg.state.battery_current.high_byte) << 8));
         state.battery_temperature = static_cast<int16_t>(
-                                        (static_cast<uint16_t>(msg.state.battery_temperature.low_byte)) |
-                                        (static_cast<uint16_t>(msg.state.battery_temperature.high_byte) << 8));
+            (static_cast<uint16_t>(msg.state.battery_temperature.low_byte)) |
+            (static_cast<uint16_t>(msg.state.battery_temperature.high_byte) << 8));
         break;
     }
     case AgxMsgBmsStatus:  //如果获取的使滇池的报警信息
@@ -560,8 +596,8 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
 
 
 
- void Connector::convert_msg_once()
- {
+void Connector::convert_msg_once()
+{
     //status_msg.header.stamp = ros::Time::now();
 
     //status_msg.linear_velocity = scout_state.linear_velocity;
@@ -591,53 +627,51 @@ void Connector::convert_data_once(const AgxMessage &status_msg,ScoutState &state
     //status_msg.rear_light_state.custom_value =
     //    scout_state.front_light_state.custom_value;
 
- }
+}
 
 
 
 void Connector::SetMotionCommand(double linear_vel, double lateral_velocity, double angular_vel, ScoutMotionCmd::FaultClearFlag fault_clr_flag)
 {
+    linear_percentage=linear_vel/1.5;
+    Omega_percentage=angular_vel/0.5235;
+    lateral_percentage=0;
     //限制运动控制指令的指令值
     // make sure cmd thread is started before attempting to send commands
     //if (!cmd_thread_started_) StartCmdThread();//如果控制进程未开启，那么开启控制进程
+#ifdef  SCOUT_V2_PROTCOL
+    if (linear_vel < ScoutCmdLimits::min_linear_velocity)
+        linear_vel = ScoutCmdLimits::min_linear_velocity;
+    if (linear_vel > ScoutCmdLimits::max_linear_velocity)
+        linear_vel = ScoutCmdLimits::max_linear_velocity;
+    if (angular_vel < ScoutCmdLimits::min_angular_velocity)
+        angular_vel = ScoutCmdLimits::min_angular_velocity;
+    if (angular_vel > ScoutCmdLimits::max_angular_velocity)
+        angular_vel = ScoutCmdLimits::max_angular_velocity;
 
+    current_motion_cmd_.linear_velocity = linear_vel;//把限制好的数值传递给cmd
+    current_motion_cmd_.angular_velocity = angular_vel;
+    current_motion_cmd_.lateral_velocity = lateral_velocity;
+    current_motion_cmd_.fault_clear_flag = fault_clr_flag;
+#else
+    if (linear_vel < ScoutMiniCmdLimits::min_linear_velocity)
+        linear_vel = ScoutMiniCmdLimits::min_linear_velocity;
+    if (linear_vel > ScoutMiniCmdLimits::max_linear_velocity)
+        linear_vel = ScoutMiniCmdLimits::max_linear_velocity;
+    if (angular_vel < ScoutMiniCmdLimits::min_angular_velocity)
+        angular_vel = ScoutMiniCmdLimits::min_angular_velocity;
+    if (angular_vel > ScoutMiniCmdLimits::max_angular_velocity)
+        angular_vel = ScoutMiniCmdLimits::max_angular_velocity;
+    if (lateral_velocity < ScoutMiniCmdLimits::min_lateral_velocity)//为各个控制指令增加限制
+        lateral_velocity = ScoutMiniCmdLimits::min_lateral_velocity;
+    if (lateral_velocity > ScoutMiniCmdLimits::max_lateral_velocity)
+        lateral_velocity = ScoutMiniCmdLimits::max_lateral_velocity;
 
-    if (1)  //根据车型选择速度限制的数值//非mini车
-    {
-        if (linear_vel < ScoutCmdLimits::min_linear_velocity)
-            linear_vel = ScoutCmdLimits::min_linear_velocity;
-        if (linear_vel > ScoutCmdLimits::max_linear_velocity)
-            linear_vel = ScoutCmdLimits::max_linear_velocity;
-        if (angular_vel < ScoutCmdLimits::min_angular_velocity)
-            angular_vel = ScoutCmdLimits::min_angular_velocity;
-        if (angular_vel > ScoutCmdLimits::max_angular_velocity)
-            angular_vel = ScoutCmdLimits::max_angular_velocity;
-
-        current_motion_cmd_.linear_velocity = linear_vel;//把限制好的数值传递给cmd
-        current_motion_cmd_.angular_velocity = angular_vel;
-        current_motion_cmd_.lateral_velocity = lateral_velocity;
-        current_motion_cmd_.fault_clear_flag = fault_clr_flag;
-    }
-    else
-    {
-        if (linear_vel < ScoutMiniCmdLimits::min_linear_velocity)
-            linear_vel = ScoutMiniCmdLimits::min_linear_velocity;
-        if (linear_vel > ScoutMiniCmdLimits::max_linear_velocity)
-            linear_vel = ScoutMiniCmdLimits::max_linear_velocity;
-        if (angular_vel < ScoutMiniCmdLimits::min_angular_velocity)
-            angular_vel = ScoutMiniCmdLimits::min_angular_velocity;
-        if (angular_vel > ScoutMiniCmdLimits::max_angular_velocity)
-            angular_vel = ScoutMiniCmdLimits::max_angular_velocity;
-        if (lateral_velocity < ScoutMiniCmdLimits::min_lateral_velocity)//为各个控制指令增加限制
-            lateral_velocity = ScoutMiniCmdLimits::min_lateral_velocity;
-        if (lateral_velocity > ScoutMiniCmdLimits::max_lateral_velocity)
-            lateral_velocity = ScoutMiniCmdLimits::max_lateral_velocity;
-
-        current_motion_cmd_.linear_velocity = linear_vel;
-        current_motion_cmd_.angular_velocity = angular_vel;
-        current_motion_cmd_.lateral_velocity = lateral_velocity;
-        current_motion_cmd_.fault_clear_flag = fault_clr_flag;
-    }
+    current_motion_cmd_.linear_velocity = linear_vel;
+    current_motion_cmd_.angular_velocity = angular_vel;
+    current_motion_cmd_.lateral_velocity = lateral_velocity;
+    current_motion_cmd_.fault_clear_flag = fault_clr_flag;
+#endif
 }
 
 
@@ -649,7 +683,7 @@ void Connector::SendMotionCmd()
     // motion control message
     AgxMessage m_msg;//定义msg
     m_msg.type = AgxMsgMotionCommand;//选择can'通信种类为运动控制
-// memset(m_msg.body.motion_command_msg.raw, 0, 8);//初始化参信息
+    // memset(m_msg.body.motion_command_msg.raw, 0, 8);//初始化参信息
 
     //motion_cmd_mutex_.lock();//上锁保证在进行如下操作的时候相关的变量值不会被其他进程修改
     int16_t linear_cmd =
@@ -676,7 +710,11 @@ void Connector::SendMotionCmd()
 
     // send to can bus
     can_frame m_frame;//定义can框架对象
+#ifdef SCOUT_V2_PROTCOL
     EncodeCanFrame(&m_msg, &m_frame);//打包can信息
+#else
+    EncodeCanFrameV1(&m_msg, &m_frame);
+#endif
     snd_buffermutex.lock();
     copy_to_buffer(&m_frame,snd_buffer);
     snd_buffermutex.unlock();
@@ -725,7 +763,11 @@ void Connector::SendLightCmd(const ScoutLightCmd &lcmd, uint8_t count)
 
     // send to can bus
     can_frame l_frame;//把msg填充到参框架中
-    EncodeCanFrame(&l_msg, &l_frame);
+#ifdef SCOUT_V2_PROTCOL
+    EncodeCanFrame(&l_msg, &l_frame);//打包can信息
+#else
+    EncodeCanFrameV1(&l_msg, &l_frame);
+#endif
     snd_buffermutex.lock();
     copy_to_buffer(&l_frame,snd_buffer);//将can信息以流的形式发送
     snd_buffermutex.unlock();

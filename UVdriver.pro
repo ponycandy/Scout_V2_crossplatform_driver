@@ -3,9 +3,17 @@ QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
+
+win32{
 INCLUDEPATH += C:\Boost\include\boost-1_83
-LIBS += -LC:\Boost\lib -llibboost_thread-vc143-mt-gd-x64-1_83
-LIBS += -LC:\Boost\lib -llibboost_serialization-vc143-mt-gd-x64-1_83
+LIBS += -LC:\Boost\lib  -llibboost_system-vc143-mt-gd-x64-1_83 -llibboost_serialization-vc143-mt-gd-x64-1_83 -llibboost_thread-vc143-mt-gd-x64-1_83
+}
+
+unix {
+INCLUDEPATH += /home/nvidia/boost_1_83_0
+LIBS += -L/home/nvidia/boost_1_83_0/stage/lib -lboost_thread -lboost_serialization -lboost_system -lpthread
+}
+
 DESTDIR = D:\QT\prjdir\OSGIMODULE\my_simulation_dir\build
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.

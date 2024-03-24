@@ -6,12 +6,24 @@
 #include <state_cmd_struct.h>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
-
+#define SCOUT_V1_PROTCOL
 struct can_frame {//定义can结构
     uint32_t can_id;
     uint8_t can_dlc;
     uint8_t data[8] ;
 };
+
+typedef struct {
+    uint8_t control_mode;
+    uint8_t error_clear_byte;
+    int8_t linear_percentage;
+    int8_t angular_percentage;
+    int8_t lateral_percentage;
+    uint8_t reserved0;
+    uint8_t count;
+    uint8_t checksum;
+} MotionCommandFrame;
+
 
 #endif
 
@@ -55,6 +67,9 @@ public:
     uint8_t snd_buffer[13] {};
 
     can_frame canframe;
+    float linear_percentage;
+    float Omega_percentage;
+    float lateral_percentage;
     can_frame* can_frame_pt{ &canframe };
     AgxMessage agx_msg;
     AgxMessage* agx_msg_pt{ &agx_msg };
@@ -76,6 +91,8 @@ public:
     void copy_to_buffer(const can_frame *tx_frame,uint8_t *msg);
     void copy_to_can_frame(can_frame *rx_frame,const uint8_t *msg);
     void EncodeCanFrame(const AgxMessage *msg, struct can_frame *tx_frame);
+    void EncodeCanFrameV1(const AgxMessage *msg, struct can_frame *tx_frame);
+    uint8_t CalcCanFrameChecksumV1(uint16_t id, uint8_t *data, uint8_t dlc);
     bool DecodeCanFrame(const struct can_frame *rx_frame, AgxMessage *msg);
     void convert_data_once(const AgxMessage &status_msg,ScoutState &state);
     void  convert_msg_once();
