@@ -4,10 +4,9 @@
 #include <unistd.h>
 #include <iostream>
 #include <sys/types.h>
-#include <mutex>
-#include <thread>
+#include "boost/thread.hpp"
 // #include "QDebug"
-Connector::Connector(int baud)
+Connector::Connector(int baud):io_context_()
 {
     m_sockfd=0;
     baud_rate=baud;//如500k/bit则输入500
@@ -26,34 +25,104 @@ Connector::Connector(int baud)
 
 Connector::~Connector()
 {
-    if (m_sockfd!=0) close(m_sockfd);
+}
+
+void Connector::handleRead(const boost::system::error_code &error, std::size_t bytes_transferred)
+{
+    static int counter=0;
+    if (!error)
+    {
+        //啥都不干
+        std::string command(data_);
+        memset(data_, 0x00, max_length);
+        Core_socket->async_read_some(boost::asio::buffer(data_, max_length),
+                                     boost::bind(&Connector::handleRead, this,
+                                                 boost::asio::placeholders::error,
+                                                 boost::asio::placeholders::bytes_transferred));
+        // std::cout<<"trigger a callback"<<counter++<<std::endl;
+    }
+    else {
+        // Handle error
+    }
 }
 
 
+int Connector::init(std::string Ipaddress, int port)
+{
+    Core_socket = new boost::asio::ip::tcp::socket(io_context_);
+    boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(Ipaddress), port);
 
+    Core_socket->connect(endpoint);
+    internel_socket = Core_socket;
+
+    Core_socket->async_read_some(boost::asio::buffer(data_, max_length),
+                                 boost::bind(&Connector::handleRead, this,
+                                             boost::asio::placeholders::error,
+                                             boost::asio::placeholders::bytes_transferred));
+
+
+
+
+    unsigned char strbuffer[13] = { 0x08,0x00,0x00,0x04,0x21,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+    Send(strbuffer, 13);
+    unsigned char strbuffer0[13] = { 0x08,0x00,0x00,0x01,0x21,0x01,0x01,0x05,0x01,0x05,0x00,0x00,0x00 };
+
+    unsigned char strbuffer1[13] = { 0x08,0x00,0x00,0x01,0x21,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+
+    unsigned char strbuffer2[13] = { 0x08,0x00,0x00,0x01,0x21,0x01,0x01,0x05,0x01,0x05,0x00,0x00,0x00 };
+
+    //char strbuf1[8] {\000,\000,\000,\000,\000,\000,\000,\b};
+    Send(strbuffer0, 13);
+    boost::this_thread::sleep(boost::posix_time::seconds(1));
+    Send(strbuffer1, 13);
+    boost::this_thread::sleep(boost::posix_time::seconds(1));
+    Send(strbuffer2, 13);
+    boost::this_thread::sleep(boost::posix_time::seconds(1));
+    printf("initialization completed. \n");
+
+    boost::thread Iothread(boost::bind(&Connector::runIoContext, this));
+    boost::thread Iothread_control(boost::bind(&Connector::Control_thread, this));
+
+    return 1;
+}
+
+int Connector::Send(const void *buf, const int buflen)
+{
+    boost::asio::const_buffer buffer(buf, buflen);
+    // return boost::asio::write(Core_socket, buffer);
+    return Core_socket->write_some(buffer);
+}
+
+void Connector::runIoContext()
+{
+    io_context_.run();
+}
 
 
 
 void Connector::Control_thread( )
 {
+    while(true)
+    {
+        try {
+
+            // Try to create a const_buffer
+            snd_buffermutex.lock();
+            boost::asio::const_buffer buffer(snd_buffer, 13);
+            internel_socket->write_some(buffer);
+            snd_buffermutex.unlock();
+            // Use the buffer here
+            // ...
+            boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+            //50HZ的控制更新频率
+
+        }
+        catch(const std::exception& e) {
+            std::cerr << "An error occurred: " << e.what() << std::endl;
+            // qDebug()<<"An error occurred: " << e.what() ;
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-bool Connector::start_read_thread()
-{
-    return true;
-}
-
-
-
 void Connector::EncodeCanFrame(const AgxMessage *msg, struct can_frame *tx_frame)
 {
     //将msg中的信息传入到要发送的can_frame中
@@ -331,20 +400,6 @@ void Connector::copy_to_buffer(const can_frame *tx_frame,uint8_t *msg)
     {
         msg[i + 5] = tx_frame->data[i];
     }
-    // boost::asio::const_buffer buffer(msg, 13);
-    try {
-
-        // Try to create a const_buffer
-        boost::asio::const_buffer buffer(msg, 13);
-        internel_socket->write_some(buffer);
-        // Use the buffer here
-        // ...
-
-    } catch(const std::exception& e) {
-        std::cerr << "An error occurred: " << e.what() << std::endl;
-        // qDebug()<<"An error occurred: " << e.what() ;
-    }
-
 }
 
 
@@ -622,7 +677,10 @@ void Connector::SendMotionCmd()
     // send to can bus
     can_frame m_frame;//定义can框架对象
     EncodeCanFrame(&m_msg, &m_frame);//打包can信息
+    snd_buffermutex.lock();
     copy_to_buffer(&m_frame,snd_buffer);
+    snd_buffermutex.unlock();
+
 }
 
 
@@ -668,7 +726,10 @@ void Connector::SendLightCmd(const ScoutLightCmd &lcmd, uint8_t count)
     // send to can bus
     can_frame l_frame;//把msg填充到参框架中
     EncodeCanFrame(&l_msg, &l_frame);
+    snd_buffermutex.lock();
     copy_to_buffer(&l_frame,snd_buffer);//将can信息以流的形式发送
+    snd_buffermutex.unlock();
+
 }
 
 

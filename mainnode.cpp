@@ -1,5 +1,5 @@
 #include <iostream>
-#include "test_connect.h"
+#include "connector_base.h"
 #include <iostream>
 #include "gpcsnode.h"
 // #include "QDebug"
@@ -15,7 +15,7 @@ struct motioncommand
 };
 int counter=0;
 double deltat=0;
-test_connect ioport(500);
+Connector ioport(500);
 void getremotecmd(const std::string& data)
 {
     std::cout<<"第i次接收数据"<<counter++<<std::endl;

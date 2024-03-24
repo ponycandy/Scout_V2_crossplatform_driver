@@ -5,6 +5,7 @@
 #include <can_msg_name.h>
 #include <state_cmd_struct.h>
 #include <boost/asio.hpp>
+#include <boost/thread.hpp>
 
 struct can_frame {//定义can结构
     uint32_t can_id;
@@ -34,12 +35,21 @@ struct ScoutParams//定义一些硬件参数
 class Connector
 {
 public:
+
+    boost::asio::io_context io_context_;
+    boost::asio::ip::tcp::socket* Core_socket;
+    boost::mutex snd_buffermutex;
+
     int m_sockfd;
     int baud_rate;
     int wait_time = 10;
     int recsize;
     int line_num=10;
     int control_period_ms {10};
+
+    enum { max_length = 1024 };
+    char data_[max_length];
+
     uint8_t rec_buffer0[13] {};
     uint8_t rec_buffer[8192] {};
     uint8_t snd_buffer[13] {};
@@ -56,9 +66,13 @@ public:
 
     Connector(int baud);
     ~Connector();
+    void handleRead(const boost::system::error_code& error, std::size_t bytes_transferred);
+    int init(std::string Ipaddress, int port);
+    // 向对端发送报文
+    int  Send(const void *buf,const int buflen);
+    void runIoContext();
     void Control_thread( );
     void Read_thread();
-    bool start_read_thread();
     void copy_to_buffer(const can_frame *tx_frame,uint8_t *msg);
     void copy_to_can_frame(can_frame *rx_frame,const uint8_t *msg);
     void EncodeCanFrame(const AgxMessage *msg, struct can_frame *tx_frame);

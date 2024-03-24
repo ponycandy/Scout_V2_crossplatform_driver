@@ -16,8 +16,7 @@ SOURCES += \
  gpcsnode.cpp\
  mainnode.cpp\
  Publisher.cpp\
- session.cpp\
- test_connect.cpp
+ session.cpp
 
 HEADERS += \
  ALLconfig.h\
@@ -29,6 +28,4 @@ HEADERS += \
  Publisher.h\
  session.h\
  state_cmd_struct.h\
- Subscriber.h\
- test_connect.h
-
+ Subscriber.h
