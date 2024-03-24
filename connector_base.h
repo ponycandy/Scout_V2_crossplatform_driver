@@ -5,16 +5,13 @@
 #include <can_msg_name.h>
 #include <state_cmd_struct.h>
 #include <boost/asio.hpp>
-//struct can_frame {//定义can结构
-//  uint32_t can_id;
-//  uint8_t can_dlc;
-//  uint8_t data[8] __declspec(align(8));
-//};
+
 struct can_frame {//定义can结构
     uint32_t can_id;
     uint8_t can_dlc;
     uint8_t data[8] ;
 };
+
 #endif
 
 struct ScoutParams//定义一些硬件参数
@@ -61,7 +58,6 @@ public:
     ~Connector();
     void Control_thread( );
     void Read_thread();
-    bool start_control_thread();
     bool start_read_thread();
     void copy_to_buffer(const can_frame *tx_frame,uint8_t *msg);
     void copy_to_can_frame(can_frame *rx_frame,const uint8_t *msg);

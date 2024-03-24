@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <mutex>
 #include <thread>
-
+// #include "QDebug"
 Connector::Connector(int baud)
 {
     m_sockfd=0;
@@ -41,17 +41,8 @@ void Connector::Control_thread( )
 
 
 
-void Connector::Read_thread()
-{
-}
 
 
-
-
-bool Connector::start_control_thread()
-{
-    return true;
-}
 
 
 
@@ -340,9 +331,20 @@ void Connector::copy_to_buffer(const can_frame *tx_frame,uint8_t *msg)
     {
         msg[i + 5] = tx_frame->data[i];
     }
-    boost::asio::const_buffer buffer(msg, 13);
-    // boost::asio::write(internel_socket, buffer);
-    internel_socket->write_some(buffer);
+    // boost::asio::const_buffer buffer(msg, 13);
+    try {
+
+        // Try to create a const_buffer
+        boost::asio::const_buffer buffer(msg, 13);
+        internel_socket->write_some(buffer);
+        // Use the buffer here
+        // ...
+
+    } catch(const std::exception& e) {
+        std::cerr << "An error occurred: " << e.what() << std::endl;
+        // qDebug()<<"An error occurred: " << e.what() ;
+    }
+
 }
 
 

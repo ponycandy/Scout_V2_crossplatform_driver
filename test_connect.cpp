@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <boost/thread.hpp>
 
-
+#include <iostream>
 test_connect::test_connect(int baud) :Connector(baud), io_context_()
 {
 
@@ -27,6 +27,14 @@ int test_connect::init(std::string Ipaddress, int port)
 	Core_socket->connect(endpoint);
 	internel_socket = Core_socket;
 
+    Core_socket->async_read_some(boost::asio::buffer(data_, max_length),
+                                 boost::bind(&test_connect::handleRead, this,
+                                             boost::asio::placeholders::error,
+                                             boost::asio::placeholders::bytes_transferred));
+
+    boost::thread Iothread(boost::bind(&test_connect::runIoContext, this));
+
+
 	unsigned char strbuffer[13] = { 0x08,0x00,0x00,0x04,0x21,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 	Send(strbuffer, 13);
 	unsigned char strbuffer0[13] = { 0x08,0x00,0x00,0x01,0x21,0x01,0x01,0x05,0x01,0x05,0x00,0x00,0x00 };
@@ -46,6 +54,25 @@ int test_connect::init(std::string Ipaddress, int port)
     return 1;
 }
 
+void test_connect::handleRead(const boost::system::error_code &error, std::size_t bytes_transferred)
+{
+    static int counter=0;
+    if (!error)
+    {
+        //啥都不干
+        std::string command(data_);
+        memset(data_, 0x00, max_length);
+        Core_socket->async_read_some(boost::asio::buffer(data_, max_length),
+                                     boost::bind(&test_connect::handleRead, this,
+                                                 boost::asio::placeholders::error,
+                                                 boost::asio::placeholders::bytes_transferred));
+        std::cout<<"trigger a callback"<<counter++<<std::endl;
+    }
+    else {
+        // Handle error
+    }
+}
+
 
 void test_connect::unpack_all() //打印一次所有信息，调试专用函数
 {
@@ -58,6 +85,19 @@ void test_connect::unpack_all() //打印一次所有信息，调试专用函数
 void test_connect::printall()//打印一次所有信息，调试专用函数
 {
 
+}
+
+void test_connect::runIoContext()
+{
+    io_context_.run();
+}
+
+void test_connect::startreadthreading()
+{
+    while(true)
+    {
+
+    }
 }
 
 
